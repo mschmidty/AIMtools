@@ -1,0 +1,110 @@
+---
+title: "DIMA Test"
+author: "Michael Schmidt"
+date: "8/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(RODBC)
+library(AIMtools)
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+file_path<-list.files("test_data/DIMA_5_5", pattern=".mdb", full.names=TRUE)
+connect<-odbcDriverConnect("Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=data/DIMA_5_5/DIMA_2020.mdb")
+connect<-odbcConnectAccess(file_path)
+
+sqlTables(connect)%>%
+  View()
+
+lpi_detail<-sqlFetch(connect, "tblLPIDetail")
+
+sqlFetch(connect, "tblLines")%>%
+  View()
+
+```
+
+## Read DIMA function
+```{r}
+Sys.getenv("R_ARCH")
+
+read_dima<-function(file_path){
+  
+  read_table<-function(connection, name) as_tibble(sqlFetch(connection, name))
+  
+  if(Sys.getenv("R_ARCH") != "/i386"){
+    
+    stop('You are currently using a 64-bit version of R. Please change your R version to 32-bit in "Tools>Global Options" and in the dropdown change your R version to 32-bit. Microsoft Access Does not work with 64-bit R.')
+  }
+  con<-odbcConnectAccess(file_path)
+  
+  test<-list(
+    plots = read_table(con, "tblPlots"),
+    lines = read_table(con, "tblLines"),
+    lpi_detail = read_table(con, "tblLPIDetail"),
+    lpi_header = read_table(con, "tblLPIHeader"),
+    sp_rich_detail = read_table(con, "tblSpecRichDetail"),
+    sp_rich_header = read_table(con, "tblSpecRichHeader")
+  )
+  
+  odbcClose(con)
+  
+  test
+}
+
+data<-read_dima(file_path)
+```
+
+[x] This was copied to R - into the 
+
+
+```{r}
+library(AIMtools)
+file_path<-list.files("test_data/2018", pattern=".mdb", full.names=TRUE)
+data<-read_dima(file_path)
+
+names(data)
+```
+
+
+
+## Species Richness Tests
+```{r}
+header<-data$sp_rich_header
+
+data$sp_rich_detail%>%
+  select(-SpeciesCount)%>%
+  tidyr::unnest(symbol = stringr::str_split(SpeciesList, ";"))%>%
+  select(-SpeciesList)%>%
+  filter(symbol!="")%>%
+  left_join(select(data$sp_rich_header, LineKey, RecKey), by="RecKey" )%>%
+  left_join(select(data$lines, LineKey, PlotKey ))%>%
+  left_join(select(data$plots, PlotKey, PlotID))
+
+names(data)
+
+detail%>%
+  count(RecKey)
+
+detail%>%
+  count(symbol)%>%
+  View()
+
+detail%>%
+  filter(symbol=="CHER")
+```
+
+### Test `sp_rich_dima()` function
+```{r}
+data<-read_dima(file_path)
+
+sp_richness<-sp_rich_dima(data)
+```
+

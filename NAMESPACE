@@ -1,0 +1,8 @@
+exportPattern("^[[:alpha:]]+")
+
+import(dplyr)
+importFrom(magrittr, "%>%")
+import(tidyr)
+import(stringr)
+import(RODBC)
+import(readr)

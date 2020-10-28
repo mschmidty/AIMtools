@@ -1,0 +1,135 @@
+---
+title: "Sage Tests"
+author: "Michael Schmidt"
+date: "10/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(AIMtools)
+library(magrittr)
+?cover()
+```
+
+```{r}
+cover(agol_2019, type="detailed", by="line")%>%
+  dplyr::filter(stringr::str_detect(symbol, "^AR"))%>%
+  dplyr::filter(symbol != "ARPU9" & symbol != "ARCA14")%>%
+  dplyr::mutate(sage_type = dplyr::case_when(
+    symbol == "ARBI3" ~ "Bigelow sagebrush",
+    symbol == "ARLU" ~ "White sagebrush",
+    stringr::str_detect(symbol, "^ARTR") ~ "Big sagebrush",
+    symbol == "ARNO4" ~ "Black sagebrush",
+    stringr::str_detect(symbol, "^ARAR") ~ "Little sagebrush",
+  ))
+```
+
+
+## Test
+```{r}
+library(tidyverse)
+library(AIMtools)
+library(arcgisbinding)
+arc.check_product()
+library(extrafont)
+loadfonts()
+
+
+theme_set(schmidtytheme::theme_schmidt()+
+            theme(
+              text=element_text(family="Public Sans"),
+              title = element_text(family ="")
+            ))
+
+
+agol<-load_data()
+agol_2019<-load_data(year=2019)
+dima_2018<-readRDS("test_cache/DIMA_2018.rds")
+
+sage<-rbind(
+  sage_cover(agol, by="plot")%>%
+    simplify_cover()%>%
+    dplyr::mutate(year = 2020), 
+  sage_cover(agol_2019, by="plot")%>%
+    simplify_cover()%>%
+    dplyr::mutate(year=2019)
+  )
+
+sage_cover(agol, by="line")
+
+sage<-sage%>%
+  dplyr::filter(sage_type=="Big sagebrush")%>%
+  dplyr::mutate(strata = str_extract(PlotID, "^.."))%>%
+  filter(!str_detect(PlotID, "^COC"))
+
+sage%>%
+  filter(strata%in%c("MS", "SS", "SD", "PJ"))%>%
+  ggplot(aes(as.factor(year), cover_perc, fill=strata))+
+  geom_boxplot()+
+  facet_wrap(~strata)
+
+sage%>%
+  mutate(PlotID = fct_reorder(PlotID, cover_perc, ))%>%
+  ggplot(aes(PlotID, cover_perc, color=strata, shape=as.factor(year)))+
+  geom_point(size=3)+
+  coord_flip()+
+  scale_color_brewer(palette="Dark2")+
+  scale_y_continuous(labels = scales::percent)+
+  labs(title = "% Sage Cover by plot",
+       subtitle="Years: 2019 and 2020",
+       y="Sage % Cover")+
+  theme(
+    axis.line = element_line(size=1, color="#333333")
+  )
+
+```
+## DIMA cover
+```{r}
+dima_cover(dima_2018, by="plot")%>%
+  dplyr::filter(stringr::str_detect(symbol, "^AR"))%>%
+  dplyr::filter(symbol != "ARPU9" & symbol != "ARCA14")%>%
+  dplyr::mutate(sage_type = dplyr::case_when(
+    symbol == "ARBI3" ~ "Bigelow sagebrush",
+    symbol == "ARLU" ~ "White sagebrush",
+    stringr::str_detect(symbol, "^ARTR") ~ "Big sagebrush",
+    symbol == "ARNO4" ~ "Black sagebrush",
+    stringr::str_detect(symbol, "^ARAR") ~ "Little sagebrush",
+  ))
+```
+
+```{r}
+
+sage_all<-rbind(
+  sage_cover(agol, by="plot")%>%
+    simplify_cover(sage=TRUE)%>%
+    dplyr::mutate(year = 2020), 
+  sage_cover(agol_2019, by="plot")%>%
+    simplify_cover(sage=TRUE)%>%
+    dplyr::mutate(year=2019),
+  dima_sage_cover(dima_2018, by="plot")%>%
+    simplify_cover(sage=TRUE)%>%
+    mutate(year=2018)
+  )%>%
+  dplyr::filter(sage_type=="Big sagebrush")%>%
+  dplyr::mutate(strata = str_extract(PlotID, "^.."))%>%
+  filter(!str_detect(PlotID, "^COC"))
+
+sage_all%>%
+  mutate(PlotID = fct_reorder(PlotID, cover_perc, ))%>%
+  ggplot(aes(PlotID, cover_perc, color=strata, shape=as.factor(year)))+
+  geom_point(size=3)+
+  coord_flip()+
+  scale_color_brewer(palette="Dark2")+
+  scale_y_continuous(labels = scales::percent)+
+  labs(title = "% Sage Cover by plot",
+       subtitle="Years: 2018, 2019 and 2020",
+       y="Sage % Cover",
+       caption="Data: Tres Rios AIM Data | by Mike Schmidt")+
+  theme(
+    axis.line = element_line(size=1, color="#333333")
+  )
+```
+
+

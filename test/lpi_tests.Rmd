@@ -1,0 +1,460 @@
+---
+title: "LPI Tests"
+author: "Michael Schmidt"
+date: "9/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# For all of the functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+I need to figure out how out how to make sure that those plants that do not join with the plant list `data/plant_list/CO_Survey123_species_20200504.csv` do not have NAs for growth habit. 
+
+```{r}
+library(AIMtools)
+library(magrittr)
+```
+## DIMA Version
+### Canopy Cover
+```{r}
+file_path<-list.files("test_data/2018", pattern=".mdb", full.names=TRUE)
+data<-read_dima(file_path)
+
+lower_codes<-subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail)))
+
+line_cover<-data$lpi_detail%>%
+  dplyr::select(RecKey,
+                TopCanopy, 
+                subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail))))%>%
+  tidyr::pivot_longer(!RecKey, 
+                      names_to="cover", 
+                      values_to="symbol", 
+                      values_drop_na=TRUE)%>%
+  dplyr::group_by(RecKey, symbol)%>%
+  dplyr::summarize(cover_perc = dplyr::n()/50)%>%
+  dplyr::ungroup()%>%
+  dplyr::left_join(dplyr::select(data$lpi_header, LineKey, RecKey))%>%
+  dplyr::left_join(data$join_table)%>%
+  dplyr::left_join(data$plant_list, by=c("symbol"="name"))%>%
+  fix_plant_list()
+
+line_cover%>%
+  dplyr::group_by(PlotID, PlotKey, Type, GrowthHabitSub, symbol)%>%
+  dplyr::summarize(cover_perc=mean(cover_perc, na.rm=T))
+
+
+```
+
+## DIMA LPI Test
+```{r}
+library(AIMtools)
+library(magrittr)
+
+file_path<-list.files("test_data/2018", pattern=".mdb", full.names=TRUE)
+data<-read_dima(file_path)
+
+dima_canopy_cover(data, by="plot")
+```
+
+
+
+Todo: 
+[] - Add in Checkbox for dead or alive. 
+```{r}
+dima_canopy_cover<-function(data){
+  data$lpi_detail%>%
+    dplyr::select(RecKey,
+                  TopCanopy, 
+                  subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail))),
+                  SoilSurface)%>%
+    tidyr::pivot_longer(!RecKey, 
+                        names_to="cover", 
+                        values_to="symbol", 
+                        values_drop_na=TRUE)%>%
+    dplyr::group_by(RecKey, symbol)%>%
+    dplyr::summarize(cover_perc = dplyr::n()/150)%>%
+    dplyr::ungroup()%>%
+    dplyr::left_join(dplyr::select(data$lpi_header, LineKey, RecKey))%>%
+    dplyr::left_join(data$join_table)%>%
+    dplyr::group_by(PlotID, PlotKey, symbol)%>%
+    dplyr::summarize(cover_perc=sum(cover_perc))%>%
+    dplyr::ungroup()
+}
+dima_canopy_cover(data)%>%
+  View()
+```
+
+### Heights
+```{r}
+height_sub<-data$lpi_detail%>%
+  dplyr::select(RecKey, PointNbr, HeightWoody:ChkboxHerbaceous)%>%
+  dplyr::filter(PointNbr %% 5 == 0)%>%
+  dplyr::left_join(dplyr::select(data$lpi_header, RecKey, LineKey))%>%
+  dplyr::left_join(data$join_table)
+
+height_sub%>%
+  dplyr::group_by(PlotKey, PlotID)%>%
+  dplyr::na_if(0)%>%
+  dplyr::summarize(woody_avg = mean(HeightWoody, na.rm = T), 
+                   num_woody_heights = 30-sum(is.na(HeightWoody)),
+                   herb_avg_height = mean(HeightHerbaceous, na.rm = T),
+                   num_herb_heights = 30-sum(is.na(HeightWoody)),
+                   big_sage_avg_height = mean(HeightWoody[grepl("^ARTR", SpeciesWoody)], na.rm = TRUE),
+                   big_sage_count = sum(grepl("^ARTR", SpeciesWoody)),
+                   sage_shape_s_proportion = sum(ShrubShape == "S", na.rm=T)/big_sage_count,
+                   sage_shape_m_proportion = sum(ShrubShape == "M", na.rm=T)/big_sage_count,
+                   sage_shape_c_proportion = sum(ShrubShape == "C", na.rm=T)/big_sage_count)%>%
+  dplyr::ungroup()
+
+dima_heights(data)
+
+
+
+```
+
+
+## DIMA testing on 2018 Data
+```{r}
+library(AIMtools)
+library(tidyverse)
+data<-read_dima("test_data/2018/DIMA_5_3_11202018.mdb")
+saveRDS(data,"test_cache/DIMA_2018.rds")
+
+data2<-read_dima("test_data/DIMA_5_5/DIMA_2020.mdb")
+saveRDS(data2,"test_cache/DIMA_2020.rds")
+
+dima_2018<-readRDS("test_cache/DIMA_2018.rds")
+
+names(dima_2018)
+
+plant_list<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
+  dplyr::select(list_name:fulllist)
+
+dima_cover<-dima_canopy_cover(dima_2018)%>%
+  dplyr::left_join(plant_list, by= c("symbol"="name"))
+
+```
+
+## AGOL Version
+General Data Return
+```{r}
+agol$lpi%>%
+  tibble::as_tibble()%>%
+  dplyr::filter(stringr::str_detect(LineKey, "TRFO|COS01000"))%>%
+  dplyr::select(PlotID, PlotKey, LineKey, avgwoody:pctrockcover)%>%
+  dplyr::mutate_at(dplyr::vars(avgwoody:pctrockcover), as.numeric)%>%
+  dplyr::group_by(PlotID, PlotKey)%>%
+  dplyr::summarize_at(dplyr::vars(avgwoody:pctrockcover), mean, na.rm=T)%>%
+  dplyr::ungroup()
+```
+By Plant 
+```{r}
+library(AIMtools)
+library(arcgisbinding)
+library(migritr)
+arc.check_product()
+
+agol_2019<-load_data(year=2019)
+agol<-load_data()
+
+## Build Unknown Plants list
+unknown_plants<-agol$unknown_plants%>%
+  tibble::as_tibble()%>%
+  dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  dplyr::select(UnknownCode, FinalCode)
+
+## Build Join Table for Uknown plants. 
+unknown_codes_lpi <- agol$lpi_detail%>%
+  tibble::as_tibble()%>%
+  dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000"))%>%
+  dplyr::select(PointNbr,
+                parentglobalid,
+                UnknownCodeTop,
+                subset(names(.), grepl("UnknownCodeLower.", names(.))))%>%
+  tidyr::pivot_longer(!PointNbr:parentglobalid, 
+                        names_to="cover_unknown", 
+                        values_to="symbol_unknown", 
+                        values_drop_na = TRUE)%>%
+  dplyr::mutate(cover_unknown = stringr::str_extract(cover_unknown,"Lower.|Top$"),
+                cover_unknown = ifelse(cover_unknown == "Top", "TopCanopy", cover_unknown))
+
+plant_list<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
+  dplyr::select(list_name:fulllist)
+
+parent_keys<-agol$lpi%>%
+  dplyr::select(PlotID, globalid, PlotKey)
+  
+
+line<-agol$lpi_detail%>%
+  tibble::as_tibble()%>%
+  dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000"))%>%
+  dplyr::select(RecKey,
+                PointNbr,
+                parentglobalid,
+                TopCanopy, 
+                subset(names(.), grepl("^Lower", names(.))),
+                SoilSurface)%>%
+  tidyr::pivot_longer(!RecKey:parentglobalid, 
+                        names_to="cover", 
+                        values_to="symbol", 
+                        values_drop_na = TRUE)%>%
+  dplyr::left_join(unknown_codes_lpi, by = c("parentglobalid", "PointNbr", "cover" = "cover_unknown"))%>%
+  dplyr::mutate(symbol = ifelse(!is.na(symbol_unknown)&stringr::str_detect(symbol,"XXXX$"), symbol_unknown, symbol))%>%
+  dplyr::select(-symbol_unknown)%>%
+  dplyr::left_join(unknown_plants, by = c("symbol"="UnknownCode"))%>%
+  dplyr::mutate(symbol = ifelse(is.na(FinalCode), symbol, FinalCode))%>%
+  dplyr::group_by(RecKey, parentglobalid, symbol)%>%
+  dplyr::summarize(cover_perc = dplyr::n()/50)%>%
+  dplyr::ungroup()%>%
+  dplyr::left_join(plant_list%>%
+                     dplyr::select(name, Type, GrowthHabitSub),
+                   by=c("symbol" = "name"))%>%
+  dplyr::mutate(Type =  dplyr::case_when(
+    stringr::str_detect(symbol, "^PF|^AF|^PG|^AG") ~ "NonWoody",
+    stringr::str_detect(symbol, "^SH") ~ "Woody",
+    symbol=="S" | symbol=="P" ~ "NonPlant",
+    TRUE ~ Type
+  ),
+  GrowthHabitSub = dplyr::case_when(
+    stringr::str_detect(symbol, "^PF|^AF") ~ "Forb",
+    stringr::str_detect(symbol, "^PG|^AG") ~ "Graminoid",
+    stringr::str_detect(symbol, "^SH") ~ "Shrub",
+    symbol=="S" | symbol=="P" ~ "NonPlant",
+    TRUE ~ GrowthHabitSub
+  ))%>%
+  dplyr::left_join(parent_keys, by = c("parentglobalid" = "globalid"))%>%
+  dplyr::select(-parentglobalid)
+
+line%>%
+  group_by(PlotKey, PlotID, Type, GrowthHabitSub, symbol)%>%
+  summarize(cover_perc = mean(cover_perc))
+  
+```
+
+```{r}
+library(AIMtools)
+library(arcgisbinding)
+library(magrittr)
+arc.check_product()
+agol<-load_data()
+```
+
+## Height AGOL
+
+```{r}
+
+## Build Unknown Plants list
+unknown_plants<-agol$unknown_plants%>%
+  tibble::as_tibble()%>%
+  dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  dplyr::select(UnknownCode, FinalCode)
+
+plant_list<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
+  dplyr::select(list_name:fulllist)
+
+parent_keys<-agol$lpi%>%
+  dplyr::select(PlotID, globalid, PlotKey, LineNumber)
+
+height_subset <- agol$lpi_detail%>%
+  dplyr::filter(stringr::str_detect(RecKey, "COS01000|TRFO"))%>%
+  dplyr::select(parentglobalid, 
+                RecKey,
+                PointNbr,
+                ShrubShape:HeightHerbaceous2
+                )%>%
+  dplyr::filter(!is.na(HeightHerbaceous) | !is.na(HeightWoody))
+
+
+  
+
+## Height Woody
+woody_heights<-height_subset%>%
+  dplyr::select(!subset(names(.), grepl("Herbaceous", names(.))))%>%
+  dplyr::filter(SpeciesWoody!="N")%>%
+  dplyr::left_join(unknown_plants, by=c("UnknownCodeWoody" = "UnknownCode"))%>%
+  dplyr::mutate(SpeciesWoody = ifelse(!is.na(FinalCode), FinalCode, SpeciesWoody))%>%
+  dplyr::select(-UnknownCodeWoody, -FinalCode)%>%
+  dplyr::group_by(parentglobalid, SpeciesWoody)%>%
+  dplyr::summarise(avg_height= mean(HeightWoody, rm.na = T), n=dplyr::n())%>%
+  dplyr::ungroup()%>%
+  dplyr::mutate(cat = "Woody")%>%
+  dplyr::rename(symbol = SpeciesWoody)
+
+
+## Height Herbaceous
+herb_heights <- height_subset%>%
+  dplyr::select(parentglobalid,subset(names(.), grepl("Herbaceous", names(.))))%>%
+  dplyr::mutate(SpeciesHerbaceous = ifelse(!is.na(UnknownCodeHerbaceous), UnknownCodeHerbaceous, SpeciesHerbaceous))%>%
+  dplyr::left_join(unknown_plants, by=c("UnknownCodeHerbaceous" = "UnknownCode"))%>%
+  dplyr::mutate(SpeciesHerbaceous = ifelse(!is.na(FinalCode), FinalCode, SpeciesHerbaceous))%>%
+  dplyr::select(-UnknownCodeHerbaceous, -FinalCode)%>%
+  dplyr::group_by(parentglobalid, SpeciesHerbaceous)%>%
+  dplyr::summarise(avg_height = mean(HeightHerbaceous, rm.na = T), n=dplyr::n())%>%
+  dplyr::ungroup()%>%
+  dplyr::mutate(cat = "Herbaceous")%>%
+  dplyr::rename(symbol = SpeciesHerbaceous)
+
+heights_by_line <- rbind(woody_heights, herb_heights)%>%
+  dplyr::left_join(dplyr::select(plant_list, name, Type, GrowthHabitSub), by=c("symbol"="name"))%>%
+  dplyr::left_join(parent_keys, by=c("parentglobalid" = "globalid"))%>%
+  dplyr::mutate(Type =  dplyr::case_when(
+    stringr::str_detect(symbol, "^PF|^AF|^PG|^AG") ~ "NonWoody",
+    stringr::str_detect(symbol, "^SH") ~ "Woody",
+    symbol=="S" | symbol=="P" ~ "NonPlant",
+    TRUE ~ Type
+  ),
+  GrowthHabitSub = dplyr::case_when(
+    stringr::str_detect(symbol, "^PF|^AF") ~ "Forb",
+    stringr::str_detect(symbol, "^PG|^AG") ~ "Graminoid",
+    stringr::str_detect(symbol, "^SH") ~ "Shrub",
+    symbol=="S" | symbol=="P" ~ "NonPlant",
+    TRUE ~ GrowthHabitSub
+  ))
+
+heights_by_line%>%
+  dplyr::group_by(PlotID, PlotKey, symbol, cat, Type, GrowthHabitSub)%>%
+  dplyr::summarize(avg_height = mean(avg_height, rm.na=T), n=sum(n))
+```
+
+
+
+## Testing Plot Cover
+
+I want to be able to to combine cover calcs between dima and agol. 
+```{r}
+library(AIMtools)
+library(tidyverse)
+library(arcgisbinding)
+arc.check_product()
+library(magrittr)
+library(schmidtytheme)
+library(extrafont)
+
+loadfonts(device="win")
+
+theme_set(theme_schmidt()+
+  theme(
+    text=element_text(family="Public Sans"),
+    plot.title = element_text(family="Abril Fatface", size=20)
+  ))
+
+
+agol<-load_data()
+agol_2019<-load_data(year=2019)
+dima_2018<-readRDS("test_cache/DIMA_2018.rds")
+
+agol_cover<-cover(agol, type="detailed", by="plot")%>%
+  simplify_cover(growth_type=TRUE)%>%
+  mutate(year=2020)
+agol_2019_cover<-cover(agol_2019, type="detailed", by="plot")%>%
+  simplify_cover(growth_type=TRUE)%>%
+  mutate(year=2019)
+dima_2018_cover<-dima_cover(dima_2018, by="plot")%>%
+  simplify_cover(growth_type=TRUE)%>%
+  mutate(year=2018)
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(strata!="CO", strata!="NC", strata!="TR", strata!="GRSG", strata!="AS")%>%
+  filter(symbol %in% c("N", "None"))%>%
+  ggplot(aes(as.factor(year), cover_perc))+
+  geom_violin(fill="#cccccc",color="transparent",trim=FALSE)+
+  geom_jitter(aes(color=strata),position = position_jitter(0.3), size=5, alpha=0.6)+
+  scale_color_brewer(palette="Dark2")
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(strata!="CO", strata!="NC", strata!="TR", strata!="GRSG", strata!="AS", strata!="MC")%>%
+  filter(symbol %in% c("N", "None"))%>%
+  mutate(strata=fct_reorder(strata, cover_perc, mean))%>%
+  ggplot(aes(strata, cover_perc, group=strata))+
+  geom_violin(fill="#cccccc",color="transparent",trim=FALSE)+
+  geom_jitter(aes(color=as.factor(year)),position = position_jitter(0.3), size=4, alpha=0.6)+
+  scale_color_brewer(palette="Dark2")+
+  stat_summary(fun=mean, geom="crossbar", fatten=1.5, width=0.75, aes(fill="Mean"))+
+  coord_flip()+
+  labs(title = "No Cover by Strata",
+       subtitle = "Years: 2018 to 2020",
+       color="",
+       fill="",
+       x="Strata",
+       y="% No Cover")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L), limits=c(0,1))
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(strata!="CO", strata!="NC", strata!="TR", strata!="GRSG", strata!="AS", strata!="MC")%>%
+  filter(symbol %in% c("BRTE"))%>%
+  mutate( PlotID=fct_reorder(PlotID, cover_perc))%>%
+  ggplot(aes(PlotID, cover_perc, color=strata, shape=as.factor(year)))+
+  geom_point(size=4)+
+  scale_color_brewer(palette="Dark2")+
+  coord_flip()+
+  labs(title = "Cheatgrass Cover",
+       subtitle = "All plots where present. Years: 2018 to 2020",
+       color="",
+       fill="",
+       shape="",
+       x="Plot ID",
+       y="% Cover")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L))
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(strata!="CO", strata!="NC", strata!="TR", strata!="GRSG", strata!="AS", strata!="MC")%>%
+  filter(GrowthHabitSub == "Forb")%>%
+  group_by(year, PlotID, strata)%>%
+  summarize(cover_perc = sum(cover_perc, na.rm=T))%>%
+  ungroup()%>%
+  ggplot(aes(strata, cover_perc, color=as.factor(year)))+
+  geom_violin(fill="#cccccc",color="transparent",trim=FALSE)+
+  geom_jitter(aes(color=as.factor(year)),position = position_jitter(0.3), size=4, alpha=0.6)+
+  scale_color_brewer(palette="Dark2")+
+  coord_flip()+
+  labs(title = "Forb Cover",
+       subtitle = "All plots where present. Years: 2018 to 2020",
+       color="",
+       fill="",
+       shape="",
+       x="Plot ID",
+       y="% Cover")+
+  scale_y_continuous(labels = scales::percent_format(accuracy = 5L), limits=c(0,0.75))
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(strata!="CO", strata!="NC", strata!="TR", strata!="MC", !is.na(GrowthHabitSub), GrowthHabitSub!="Sedge", GrowthHabitSub != "Succulent")%>%
+  mutate(GrowthHabitSub = case_when(
+    GrowthHabitSub %in% c("Subshrub", "SubShrub") ~ "Shrub",
+    GrowthHabitSub == "NonPlant" ~ "Rock/Litter",
+    TRUE~GrowthHabitSub
+  ))%>%
+  mutate(strata = as.factor(strata), PlotID = as.factor(PlotID), GrowthHabitSub = as.factor(GrowthHabitSub))%>%
+  group_by(strata, PlotID, GrowthHabitSub)%>%
+  summarize(cover_perc=sum(cover_perc))%>%
+  ungroup()%>%
+  pivot_wider(names_from=GrowthHabitSub, values_from=cover_perc)%>%
+  mutate_if(is.numeric, replace_na, replace = 0)%>%
+  pivot_longer(Forb:Tree, names_to="GrowthHabitSub", values_to="cover_perc")%>%
+  group_by(as.factor(strata), as.factor(GrowthHabitSub), .drop=FALSE)%>%
+  summarize(cover_perc = mean(cover_perc))%>%
+  ungroup()%>%
+  rename(GrowthHabitSub = `as.factor(GrowthHabitSub)`, strata = `as.factor(strata)`)%>%
+  ggplot(aes(x=strata, y=cover_perc, group=GrowthHabitSub))+
+  scale_fill_brewer(palette="Dark2")+
+  geom_area(aes(fill=GrowthHabitSub), color = background_color, size=1, alpha=0.75)+
+  labs(title="Average Cover by Growth Habit", 
+       subtitle="All Years: 2018 to 2020",
+       y="Cover %",
+       x="Strata",
+       fill="")
+
+
+  
+  
+```
+
+
+I Really like the below plot but I need to count 0's for each Growth habit. 
+```{r}
+
+```
+
+
+

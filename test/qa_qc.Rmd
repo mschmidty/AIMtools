@@ -1,0 +1,231 @@
+---
+title: "qa_qc"
+author: "Michael Schmidt"
+date: "10/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(AIMtools)
+library(tidyverse)
+library(arcgisbinding)
+arc.check_product()
+```
+
+
+Check to see what plants are in LPI that are not in Species Richness
+```{r}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+data_20<-load_data()
+
+rich<-sp_rich(data=data_20,unknowns=T)%>%
+  rename(symbol=2, rich_count=3)
+
+lpi<-cover(data_20, type="detailed", by="plot")%>%
+  count(PlotID,symbol)%>%
+  rename(lpi_count=n)%>%
+  filter(str_detect(symbol, ".{3,}"))
+
+left_join(lpi, rich, by=c("PlotID", "symbol"))%>%
+  filter(is.na(rich_count))
+
+  ##write_csv("test_data/output/qa_qc/found_in_lpi_but_not_rich.csv")
+  
+## Check Function
+sp_rich_qc(data_20)
+
+
+```
+
+```{r}
+cover(data_20, type="detailed")%>%
+  View()
+
+data_20$lpi_detail%>%
+  dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000"))%>%
+  View()
+
+read_csv("data/plant_list/CO_Survey123_species_20200504.csv")%>%
+  View()
+```
+
+
+```{r}
+rich%>%
+  filter(PlotID=="SS-099")
+```
+
+
+## Check unknown codes with plant list
+```{r}
+library(tidyverse)
+plant_list<-read_csv("data/plant_list/CO_Survey123_species_20200504.csv")
+
+agol_20$unknown%>%
+  filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  select(PlotID, FinalCode)%>%
+  mutate(FinalCode=str_trim(FinalCode))%>%
+  left_join(plant_list, by=c("FinalCode"="name"))%>%
+  filter(is.na(label))
+
+agol_20$unknown%>%
+  filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  filter(is.na(FinalCode))%>%
+  View()
+```
+
+## Find unknowns that are not in species richness
+```{r}
+library(magrittr)
+data_20[["unknown_plants"]]<-data_20$unknown_plants%>%
+      dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
+
+unknowns<-data_20$unknown_plants%>%
+  dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  dplyr::mutate(FinalCode=ifelse(is.na(FinalCode), UnknownCode, FinalCode))%>%
+  dplyr::select(PlotID, FinalCode)%>%
+  dplyr::filter(!is.na(FinalCode))
+
+richness<-sp_rich(data_20)
+  
+dplyr::left_join(unknowns, richness, by=c("PlotID", "FinalCode"="species_code") )%>%
+  dplyr::mutate(FinalCode=stringr::str_trim(FinalCode))%>%
+  dplyr::filter(is.na(count))%>%
+  dplyr::select(PlotID, FinalCode)%>%
+  dplyr::mutate(error=paste0(FinalCode, ": Found in Unknown Plant list but not in Species  Richness on ", PlotID),
+                fix=NA)
+
+sp_rich_qc(data_20)
+  
+```
+
+```{r}
+library(AIMtools)
+library(arcgisbinding)
+arc.check_product()
+data_20<-load_data()
+
+
+unknown_qc(data_20)
+
+sp_rich_qc(data_20)
+
+qa_qc(data_20)
+```
+
+## Make Plant list with Symbols
+```{r}
+co_plant_list<-readr::read_csv("data/plant_list/co_plant_list_08262020.txt")
+accepted_symbols<-readr::read_csv("data/plant_list/co_plant_list_synonyms_10272020.csv")%>%
+  dplyr::filter(`Accepted Symbol`==Symbol)
+
+readr::read_csv("data/plant_list/co_plant_list_synonyms_10272020.csv")%>%
+  dplyr::filter(`Accepted Symbol`!=Symbol)%>%
+  dplyr::select(-`Common Name`, -Family)%>%
+  dplyr::left_join(dplyr::select(accepted_symbols, `Accepted Symbol`, `Common Name`, Family), by="Accepted Symbol")%>%
+  dplyr::select(Symbol:Family)%>%
+  dplyr::bind_rows(dplyr::select(accepted_symbols, Symbol:Family))%>%
+  readr::write_csv("data/plant_list/plant_list_with_synonyms_10272020.csv")
+```
+
+
+## New Plants 2020
+```{r}
+library(AIMtools)
+library(arcgisbinding)
+library(magrittr)
+arc.check_product()
+
+agol_20<-load_data()
+agol_19<-load_data(year=2019)
+dima_18<-readRDS("test_cache/DIMA_2018.rds")
+
+count_20<-sp_rich(agol_20)%>%
+  dplyr::count(species_code)%>%
+  dplyr::rename(agol_20=n)
+
+count_19<-sp_rich(agol_19)%>%
+  dplyr::count(species_code)%>%
+  dplyr::rename(agol_19=n)
+
+count_18<-sp_rich_dima(dima_18)%>%
+  dplyr::count(symbol)%>%
+  dplyr::rename(species_code=symbol, dima_18=n)
+
+total_plants<-dplyr::full_join(count_18, count_19)%>%
+  dplyr::full_join(count_20)%>%
+  dplyr::filter(!stringr::str_detect(species_code, "^[A-Z]{2}[0-9]{2}"))
+
+
+plant_list<-readr::read_csv("data/plant_list/plant_list_with_synonyms_10272020.csv")
+
+plant_list%>%
+  dplyr::filter(Symbol %in% c("ERLE10", "PORE", "LAPA5", "SYER", "CAFL", "FOPU2"))
+  
+
+total_plants%>%
+  dplyr::filter(is.na(agol_19)&is.na(dima_18))%>%
+  dplyr::select(species_code)%>%
+  dplyr::left_join(plant_list, by=c("species_code"="Symbol"))%>%
+  readr::write_csv("test_data/output/qa_qc/new_species_2020_V2.csv")
+
+total_plants%>%
+  dplyr::filter(is.na(agol_20)&is.na(dima_18))%>%
+  View()
+
+sp_rich(agol_20)%>%
+  dplyr::filter(species_code=="PLJA")
+```
+
+Plant_list for Synonyms
+```{r}
+library(tidyverse)
+synonym_check<-readr::read_csv("data/plant_list/co_plant_list_synonyms_10272020.csv")%>%
+  dplyr::select(`Accepted Symbol`, `Symbol`, `Scientific Name`)
+
+synonym_check%>%
+  filter(str_detect(Symbol, "^PODO"))
+
+```
+
+## Frequency All
+
+Need to run this post all the checks!
+```{r}
+
+
+total_plants%>%
+  dplyr::left_join(synonym_check, by=c("species_code"="Symbol"))%>%
+  dplyr::mutate(species_code=ifelse(`Accepted Symbol`==species_code, species_code, `Accepted Symbol`))%>%
+  dplyr::select(-`Accepted Symbol`)%>%
+  dplyr::mutate_if(is.numeric, tidyr::replace_na, replace=0)%>%
+  dplyr::group_by(species_code, `Scientific Name`)%>%
+  dplyr::summarise_if(is.numeric,sum)%>%
+  dplyr::ungroup()%>%
+  dplyr::mutate(total=(dima_18+agol_19+agol_20))%>%
+  dplyr::rename(yr_2018=dima_18, yr_2019=agol_19, yr_2020=agol_20)%>%
+  dplyr::arrange(desc(total))%>%
+  write_csv("test_data/output/final_data/sp_rich/freqency_by_species_all_years.csv")
+
+```
+
+
+## Unknowns
+```{r}
+sp_rich(agol_20)%>%
+  filter(str_detect(species_code, "[A-Z]{2}[0-9]{5}|XXXX$"))
+```
+
+```{r}
+sp_rich(agol_20)%>%
+  dplyr::filter(species_code=="ROBL")
+
+unknown_qc(agol_20)
+```
+

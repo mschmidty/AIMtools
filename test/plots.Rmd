@@ -1,0 +1,119 @@
+---
+title: "Plots"
+author: "Michael Schmidt"
+date: "10/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Height Plots
+```{r}
+library(AIMtools)
+library(tidyverse)
+library(arcgisbinding)
+library(schmidtytheme)
+
+theme_set(theme_schmidt())
+arc.check_product()
+
+agol<-load_data()
+agol_2019<-laod_data(year=2019)
+
+height_2020<-height(agol,by="plot")%>%
+  mutate(year=2020)
+height_2019<-height(agol_2019, by="plot")%>%
+  mutate(year=2019)
+
+rbind(height_2020, height_2019)%>%
+  filter(str_detect(PlotID, "^..-" ))%>%
+  mutate(strata=str_extract(PlotID, "^.."))%>%
+  filter(strata!="AS")%>%
+  ggplot(aes(strata, avg_height,fill=as.factor(year)))+
+  geom_boxplot()+
+  coord_flip()+
+  facet_wrap(~cat, scales="free_x")
+
+?facet_wrap()
+
+```
+
+## Cover Plots
+```{r}
+library(AIMtools)
+library(arcgisbinding)
+library(magrittr)
+library(tidyverse)
+library(schmidtytheme)
+library(extrafont)
+##font_import()
+
+loadfonts(device="win")
+arc.check_product()
+
+theme_set(theme_schmidt()+
+            theme(
+              text = element_text(family="Public Sans")
+            ))
+
+agol<-load_data()
+agol_2019<-load_data(year=2019)
+dima_2018<-readRDS("test_cache/DIMA_2018.rds")
+
+agol_cover<-cover(agol, type="detailed", by="plot")%>%
+  ungroup()%>%
+  select(PlotID, Type, GrowthHabitSub, symbol, cover_perc)%>%
+  mutate(year=2020)
+
+agol_2019_cover<-cover(agol_2019, type="detailed", by="plot")%>%
+  ungroup()%>%
+  select(PlotID, Type, GrowthHabitSub, symbol, cover_perc)%>%
+  mutate(year=2019)
+
+dima_2018_cover<-dima_cover(dima_2018, by="plot")%>%
+  ungroup()%>%
+  select(PlotID, Type, GrowthHabitSub, symbol, cover_perc)%>%
+  mutate(year=2018,
+         GrowthHabitSub = ifelse(symbol=="None", "None", GrowthHabitSub),
+         Type = ifelse(symbol=="None", "None", Type),
+         symbol = ifelse(symbol=="None", "N", symbol))
+
+rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
+  filter(str_detect(PlotID, "^..-"))%>%
+  mutate(GrowthHabitSub = ifelse(GrowthHabitSub %in% c("Subshrub", "SubShrub"), "Shrub", GrowthHabitSub),
+         strata = str_extract(PlotID, "^.."))%>%
+  filter(!is.na(GrowthHabitSub) & GrowthHabitSub!="Succulent" & GrowthHabitSub!="Sedge" & GrowthHabitSub!="NonPlant")%>%
+  ggplot(aes(strata, cover_perc, fill=GrowthHabitSub))+
+  geom_boxplot()+
+  coord_flip()+
+  facet_wrap(~GrowthHabitSub, scales="free_x")+
+  labs(title="Cover by Growth Habit by Strata", 
+       subtitle="AIM Data 2018 to 2020",
+       fill="",
+       y="Cover Percent",
+       x="Strata"
+       )+ 
+  theme(
+    legend.position = "none",
+    axis.line = element_line(color="#333333", size=1, linetype="solid"),
+    axis.ticks.y=element_line(color="#333333", size=1, linetype="solid")
+  )
+  
+
+
+```
+
+
+## Count Unknowns
+```{r}
+agol$unknown_plants%>%
+  dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  dplyr::mutate(ID_d = ifelse(is.na(FinalCode), "No", "Yes"))%>%
+  dplyr::count(ID_d)
+  
+unknown_count(agol, by)
+```
+
+

@@ -1,0 +1,80 @@
+---
+title: "Testing"
+author: "Michael Schmidt"
+date: "8/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(arcgisbinding)
+library(AIMtools)
+arc.check_product()
+```
+
+
+```{r}
+data_2020<-load_data()
+
+data_2019<-load_data(year = 2019)
+
+```
+
+
+## Species Richness
+### Species Richness Playground
+```{r}
+data_2019[["unknown_plants"]]%>%
+  as_tibble()%>%
+  View()
+
+data_2020[["unknown_plants"]]%>%
+      as_tibble()%>%
+      filter(grepl("COS01000|Tres Rios", Office))%>%
+      select(UnknownCode, FinalCode)
+
+data_20[["spec_rich_detail"]]%>%
+      filter(grepl("Tres Rios|COS01000|TRFO", RecKey))%>%
+      mutate(species_code=FinalCode)
+      ##left_join(unknowns, by="UnknownCode")%>%
+      ##mutate(species_code=ifelse(!is.na(FinalCode), FinalCode, SpeciesList))
+```
+
+### Testing Final Species Rich Functions
+```{r}
+test<-sp_rich(data_2020)
+```
+```{r}
+join_1<-dplyr::select(dima_18$lines, LineKey, PlotKey)%>%
+  dplyr::mutate(PlotKey=as.character(PlotKey))
+
+join_2<-dplyr::select(dima_18$plots, PlotKey, PlotID)%>%
+  dplyr::mutate(PlotKey=as.character(PlotKey))
+
+
+
+dima_18$sp_rich_detail%>%
+      dplyr::select(-SpeciesCount)%>%
+      tidyr::unnest(symbol = stringr::str_split(SpeciesList, ";"))%>%
+      dplyr::select(-SpeciesList)%>%
+      dplyr::filter(symbol!="")%>%
+      dplyr::left_join(dplyr::select(dima_18$sp_rich_header, LineKey, RecKey), by="RecKey" )%>%
+      dplyr::left_join(join_1)%>%
+      dplyr::left_join(join_2)
+```
+
+
+## Species Rich
+By Plot tests
+```{r}
+names(data_20)
+
+data_20$spec_rich_detail%>%
+  dplyr::filter(grepl("Tres Rios|COS01000|TRFO", RecKey))%>%
+  dplyr::left_join(dplyr::select(data_20$species_richness, PlotID, globalid), by=c("parentglobalid"="globalid"))
+  View()
+```
+

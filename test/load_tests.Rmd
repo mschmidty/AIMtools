@@ -1,0 +1,54 @@
+---
+title: "Load Data Tests"
+author: "Michael Schmidt"
+date: "11/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+```
+
+```{r}
+agol_2020<-load_data()
+
+plots<-agol_2020$plot_observation%>%
+  dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+  dplyr::mutate(easting = ifelse(is.na(Easting), DesignLong, Easting),
+                northing = ifelse(is.na(Northing), DesignLat, Northing))%>%
+  dplyr::select(PlotKey, easting, northing)%>%
+  sf::st_as_sf(coords = c("easting", "northing"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+
+trfo_extent<-st_read("test_data/shapefiles/Tres_Rios_FO_Extent.shp")
+
+ggplot()+
+  geom_sf(data=trfo_extent, color="#333333", fill="transparent")+
+  geom_sf(data=dima$spatial)
+
+agol_2019$plot_observation%>%
+      dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+      dplyr::mutate(easting = ifelse(is.na(Easting), DesignLong, Easting),
+                    northing = ifelse(is.na(Northing), DesignLat, Northing))%>%
+      dplyr::select(PlotKey, easting, northing)%>%
+      dplyr::filter(!is.na(easting))%>%
+      sf::st_as_sf(coords = c("easting", "northing"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+
+```
+
+```{r}
+dima[["spatial"]]<-dima$plots%>%
+  dplyr::select(SiteKey, PlotKey, PlotID, Easting, Northing)%>%
+  dplyr::filter(!is.na(Easting))%>%
+  sf::st_as_sf(coords = c("Easting", "Northing"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")%>%
+  dplyr::filter(!stringr::str_detect(SiteKey, "^888|^999"))
+
+saveRDS(dima,"test_cache/DIMA_2018.rds")
+```
+
+
+

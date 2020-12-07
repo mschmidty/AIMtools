@@ -29,8 +29,14 @@ read_dima<-function(file_path){
                        dplyr::mutate(PlotKey = as.character(PlotKey))
                      , by="PlotKey")
 
-  data[["plant_list"]]<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
+  data[["plant_list"]]<-plant_list%>%
     dplyr::select(list_name:fulllist)
+
+  data[["spatial"]]<-data$plots%>%
+    dplyr::select(SiteKey, PlotKey, PlotID, Easting, Northing)%>%
+    dplyr::filter(!is.na(Easting))%>%
+    sf::st_as_sf(coords = c("Easting", "Northing"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")%>%
+    dplyr::filter(!stringr::str_detect(SiteKey, "^888|^999"))
 
   data
 }

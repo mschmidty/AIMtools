@@ -2,7 +2,7 @@
 #'
 #' @param x type list produced by \code{read_dima()}.
 #' @param by default is FALSE.  Can count by unknown type if by is set to \code{type}
-#' @return A table of the number of unkonwns with a FinalCode identified.
+#' @return A table of the number of unknowns with a FinalCode identified.
 #' @examples
 #' library(AIMtools)
 #' # Make sure you are connected to AGOL Online

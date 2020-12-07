@@ -39,7 +39,6 @@ load_data<-function(year = 2020){
 
     names(data_list)<-plot_names
 
-    return(data_list)
   }else if(year == 2020){
     url_2020<-"https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/BLM_CO_AIM_2020_Plots_Service/FeatureServer"
 
@@ -63,12 +62,22 @@ load_data<-function(year = 2020){
     data_list<-lapply(api_id, read_survey_data, url_2020)
 
     names(data_list)<-plot_names
-    data_list[["unknown_plants"]]<-data_list$unknown_plants%>%
-      dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
 
-    data_list[["plant_list"]]<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv")
 
-    return(data_list)
   }
+  data_list[["unknown_plants"]]<-data_list$unknown_plants%>%
+    dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
+
+  data_list[["plant_list"]]<-plant_list
+
+  data_list[["spatial"]]<-data_list$plot_observation%>%
+    dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
+    dplyr::mutate(easting = ifelse(is.na(Easting), DesignLong, Easting),
+                  northing = ifelse(is.na(Northing), DesignLat, Northing))%>%
+    dplyr::select(PlotKey, easting, northing)%>%
+    dplyr::filter(!is.na(easting))%>%
+    sf::st_as_sf(coords = c("easting", "northing"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+
+  return(data_list)
 
 }

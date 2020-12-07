@@ -57,7 +57,7 @@ sage<-rbind(
     dplyr::mutate(year=2019)
   )
 
-sage_cover(agol, by="line")
+sage<-sage_cover(data, by="plot")
 
 sage<-sage%>%
   dplyr::filter(sage_type=="Big sagebrush")%>%

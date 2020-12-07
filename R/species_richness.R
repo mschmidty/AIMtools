@@ -3,7 +3,7 @@
 #' @param data a list of data frames created by \code{load_data()}.
 #' @param func analysis function. Can be character or vector of characters. Options are "count".
 #' @param unknowns \code{TRUE} or \code{FALSE}.  If \code{TRUE} identified unknowns in database will be merged into count data.
-# Need to get rid of dupblicates per plot
+# Need to get rid of duplicates per plot
 sp_rich<-function(data, func="count", unknowns=TRUE){
   if(unknowns == TRUE){
     unknown_data<-data[["unknown_plants"]]%>%

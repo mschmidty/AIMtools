@@ -1,7 +1,7 @@
 #' calculates sage cover percent.
 #'
 #' @param x type list produced by \code{read_dima()}.
-#' @param by if type is \code{"detailed"} this can be either \code{"plot"} or \code{"line"}. Default is \code{"line"}
+#' @param by this can be either \code{"plot"} or \code{"line"}. Default is \code{"line"}
 #' @return a tibble of sage cover percentages.
 #' @examples
 #' library(AIMtools)
@@ -13,8 +13,8 @@
 #' agol_data<-load_data()
 #'
 #' sage_cover(agol_data, by="line")
-sage_cover<-function(x, by="line"){
-  x%>%
+sage_cover<-function(x, by="line", gusg=TRUE){
+  sagebrush_cover<-x%>%
     cover(type="detailed", by=by)%>%
     dplyr::filter(stringr::str_detect(symbol, "^AR"))%>%
     dplyr::filter(symbol != "ARPU9" & symbol != "ARCA14")%>%
@@ -25,6 +25,12 @@ sage_cover<-function(x, by="line"){
       symbol == "ARNO4" ~ "Black sagebrush",
       stringr::str_detect(symbol, "^ARAR") ~ "Little sagebrush"
     ))
+  if(gusg==TRUE){
+    sagebrush_cover<-sagebrush_cover%>%
+      dplyr::filter(stringr::str_detect(symbol, "^ARTR|^ARNO"))
+  }
+  return(sagebrush_cover)
+
 }
 
 dima_sage_cover<-function(x, by="line"){

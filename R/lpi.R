@@ -92,8 +92,7 @@ cover<-function(x, type="general", by="line"){
                   cover_unknown = ifelse(cover_unknown == "Top", "TopCanopy", cover_unknown))
 
   ## Load Plant List
-  plant_list<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
-    dplyr::select(list_name:fulllist)
+  plant_list<-plant_list
 
   ## Get Parent Keys for grouping.
   parent_keys<-x$lpi%>%

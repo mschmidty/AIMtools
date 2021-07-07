@@ -7,20 +7,19 @@ sp_rich_qc<-function(x, output=FALSE){
     dplyr::rename(symbol=2, rich_count=3)
 
   lpi<-cover(x, type="detailed", by="plot")%>%
-    dplyr::count(PlotID,symbol)%>%
+    dplyr::count(PlotID, symbol, PlotKey)%>%
     dplyr::rename(lpi_count=n)%>%
     dplyr::filter(stringr::str_detect(symbol, ".{3,}"))
 
   lpi_check<-dplyr::left_join(lpi, rich, by=c("PlotID", "symbol"))%>%
     dplyr::filter(is.na(rich_count))%>%
-    dplyr::select(PlotID, symbol)%>%
+    dplyr::select(PlotID, symbol, PlotKey)%>%
     dplyr::mutate(error="Symbol appears in LPI form but not in Species Richness",
                   fix=paste0("Add this symbol to Species Richness to plot ", PlotID))
 
   unknowns<-x$unknown_plants%>%
-    dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
     dplyr::mutate(FinalCode=ifelse(is.na(FinalCode), UnknownCode, FinalCode))%>%
-    dplyr::select(PlotID, FinalCode)%>%
+    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
     dplyr::filter(!is.na(FinalCode))
 
   richness<-sp_rich(x)
@@ -28,7 +27,7 @@ sp_rich_qc<-function(x, output=FALSE){
   unknown_check<-dplyr::left_join(unknowns, richness, by=c("PlotID", "FinalCode"="species_code") )%>%
     dplyr::mutate(FinalCode=stringr::str_trim(FinalCode))%>%
     dplyr::filter(is.na(count))%>%
-    dplyr::select(PlotID, FinalCode)%>%
+    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
     dplyr::rename(symbol=FinalCode)%>%
     dplyr::mutate(error=paste0(symbol, ": Found in Unknown Plant list but not in Species  Richness on ", PlotID),
                   fix=NA)
@@ -48,12 +47,13 @@ sp_rich_qc<-function(x, output=FALSE){
 unknown_qc<-function(x, output=FALSE){
 
   final_check<-x$unknown%>%
-    dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
-    dplyr::select(PlotID, FinalCode)%>%
+    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
     dplyr::mutate(FinalCode=str_trim(FinalCode))%>%
     dplyr::left_join(x$plant_list, by=c("FinalCode"="name"))%>%
     dplyr::filter(is.na(label))%>%
-    dplyr::select(PlotID, FinalCode)%>%
+    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
+    dplyr::filter(!is.na(FinalCode))%>%
+    dplyr::arrange(Office)%>%
     dplyr::mutate(error="FinalCode in Unknown list does not have match in plant list",
                   fix=paste0(PlotID, ": Add this symbol to Survey123 Species update list or change symbol to synonym that is on the list. "))
 

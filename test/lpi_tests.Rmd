@@ -19,30 +19,42 @@ library(magrittr)
 ## DIMA Version
 ### Canopy Cover
 ```{r}
-file_path<-list.files("test_data/2018", pattern=".mdb", full.names=TRUE)
-data<-read_dima(file_path)
+dima<-readRDS("test_cache/DIMA_2020.rds")
 
-lower_codes<-subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail)))
+dima_cover<-function(data, by="line"){
 
-line_cover<-data$lpi_detail%>%
-  dplyr::select(RecKey,
-                TopCanopy, 
-                subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail))))%>%
-  tidyr::pivot_longer(!RecKey, 
-                      names_to="cover", 
-                      values_to="symbol", 
-                      values_drop_na=TRUE)%>%
-  dplyr::group_by(RecKey, symbol)%>%
-  dplyr::summarize(cover_perc = dplyr::n()/50)%>%
-  dplyr::ungroup()%>%
-  dplyr::left_join(dplyr::select(data$lpi_header, LineKey, RecKey))%>%
-  dplyr::left_join(data$join_table)%>%
-  dplyr::left_join(data$plant_list, by=c("symbol"="name"))%>%
-  fix_plant_list()
+  line_cover<-data$lpi_detail%>%
+    dplyr::select(RecKey,
+                  TopCanopy,
+                  subset(names(data$lpi_detail), grepl("^Lower", names(data$lpi_detail))))%>%
+    tidyr::pivot_longer(!RecKey,
+                        names_to="cover",
+                        values_to="symbol",
+                        values_drop_na=TRUE)%>%
+    dplyr::group_by(RecKey, symbol)%>%
+    dplyr::summarize(cover_perc = dplyr::n()/50, n=dplyr::n())%>%
+    dplyr::ungroup()%>%
+    dplyr::left_join(dplyr::select(data$lpi_header, LineKey, RecKey))%>%
+    dplyr::left_join(data$join_table)%>%
+    dplyr::left_join(data$plant_list, by=c("symbol"="name"))%>%
+    fix_plant_list()
 
-line_cover%>%
-  dplyr::group_by(PlotID, PlotKey, Type, GrowthHabitSub, symbol)%>%
-  dplyr::summarize(cover_perc=mean(cover_perc, na.rm=T))
+  if(by=="line"){
+    line_cover%>%
+      dplyr::mutate(strata=stringr::str_extract(PlotID, "^.."))
+  }else if(by == "plot"){
+    line_cover%>%
+      dplyr::group_by(PlotID, PlotKey, Type, GrowthHabitSub, symbol)%>%
+      dplyr::summarize(cover_perc=mean(cover_perc, na.rm=T))%>%
+      dplyr::ungroup()%>%
+      dplyr::mutate(strata=stringr::str_extract(PlotID, "GRSG|^.."))
+  }
+}
+dima%>%
+  dima_cover(by="plot")
+
+agol_2020%>%
+  cover(type="detailed", by="plot")
 
 
 ```
@@ -240,6 +252,9 @@ library(magrittr)
 arc.check_product()
 agol<-load_data()
 ```
+
+
+
 
 ## Height AGOL
 
@@ -451,10 +466,20 @@ rbind(agol_cover, agol_2019_cover, dima_2018_cover)%>%
 ```
 
 
-I Really like the below plot but I need to count 0's for each Growth habit. 
-```{r}
+## 2021 Tests
 
+Debugging Cover calcs.
+```{r}
+data_test<-load_data(year=2021)
+data_test$lpi_detail%>%
+  View()
+    dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000|Tres_Rios_Field_Office"))
+    
+  data_test$unknown_plants%>%
+    tibble::as_tibble()%>%
+    dplyr::select(UnknownCode, FinalCode)
 ```
+
 
 
 

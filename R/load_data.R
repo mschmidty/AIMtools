@@ -5,7 +5,7 @@ read_survey_data<-function(index, url){
     tibble::as_tibble()
 }
 
-load_data<-function(year = 2020){
+load_data<-function(year = 2021){
   if(Sys.getenv("R_ARCH") != "/x64"){
 
     stop('You are currently using a 64-bit version of R. Please change your R version to 64-bit in "Tools>Global Options" and in the dropdown change your R version to 64-bit. Microsoft Access Does not work with 64-bit R.')
@@ -44,29 +44,54 @@ load_data<-function(year = 2020){
 
     api_id<-c(seq(from=0, to=9, by=1), seq(from=11, to=12, by=1), 14, 15)
 
-    plot_names<-c("plots",
-                       "aim_photos",
-                       "gap",
-                       "known_errors",
-                       "lpi",
-                       "plot_char",
-                       "plot_observation",
-                       "soil_stability",
-                       "species_richness",
-                       "unknown_plants",
-                       "gap_detail",
-                       "lpi_detail",
-                       "soil_pit_horizons",
-                       "spec_rich_detail")
+    plot_names<-c( "plots",
+                   "aim_photos",
+                   "gap",
+                   "known_errors",
+                   "lpi",
+                   "plot_char",
+                   "plot_observation",
+                   "soil_stability",
+                   "species_richness",
+                   "unknown_plants",
+                   "gap_detail",
+                   "lpi_detail",
+                   "soil_pit_horizons",
+                   "spec_rich_detail")
 
     data_list<-lapply(api_id, read_survey_data, url_2020)
 
     names(data_list)<-plot_names
 
 
+  }else if(year==2021){
+    url_2021<-"https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/BLM_CO_AIM_2021_Plots_Service/FeatureServer"
+
+    api_id<-c(seq(from=0, to=9, by=1), seq(from=11, to=13, by=1), 15, 16)
+
+    plot_names<-c( "plots",
+                   "aim_photos",
+                   "gap",
+                   "known_errors",
+                   "lpi",
+                   "plot_char",
+                   "plot_observation",
+                   "soil_stability",
+                   "species_richness",
+                   "unknown_plants",
+                   "basal_detail",
+                   "gap_detail",
+                   "lpi_detail",
+                   "soil_pit_horizons",
+                   "spec_rich_detail")
+
+    data_list<-lapply(api_id, read_survey_data, url_2021)
+
+    names(data_list)<-plot_names
   }
   data_list[["unknown_plants"]]<-data_list$unknown_plants%>%
     dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
+
 
   data_list[["plant_list"]]<-plant_list
 

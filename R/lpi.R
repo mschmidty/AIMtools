@@ -69,17 +69,16 @@ dima_heights<-function(data, raw=FALSE){
 #' @param x data type list produced by \code{load_data()}.
 #' @param type can be \code{"general"} for generalized information by line or \code{"detailed"} for symbol level data.
 #' @param by if type is \code{"detailed"} this can be either \code{"plot"} or \code{"line"}. Default is \code{"line"}
-cover<-function(x, type="general", by="line"){
+#' @param raw if \code{TRUE} returns raw LPI data without any cover data calculated.
+cover<-function(x, type="general", raw = FALSE, by="line"){
   ## Load Unknown Plants Table for joining.
   unknown_plants<-x$unknown_plants%>%
     tibble::as_tibble()%>%
-    dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
     dplyr::select(UnknownCode, FinalCode)
 
   ## Build Join Table for Uknown plants.
   unknown_codes_lpi <- x$lpi_detail%>%
     tibble::as_tibble()%>%
-    dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000"))%>%
     dplyr::select(PointNbr,
                   parentglobalid,
                   UnknownCodeTop,
@@ -101,7 +100,6 @@ cover<-function(x, type="general", by="line"){
   if(type=="general"){
     x$lpi%>%
       tibble::as_tibble()%>%
-      dplyr::filter(stringr::str_detect(LineKey, "TRFO|COS01000"))%>%
       dplyr::select(PlotID, PlotKey, LineKey, avgwoody:pctrockcover)%>%
       dplyr::mutate_at(dplyr::vars(avgwoody:pctrockcover), as.numeric)%>%
       dplyr::group_by(PlotID, PlotKey)%>%
@@ -112,7 +110,6 @@ cover<-function(x, type="general", by="line"){
 
     line <- x$lpi_detail%>%
       tibble::as_tibble()%>%
-      dplyr::filter(stringr::str_detect(RecKey, "TRFO|COS01000"))%>%
       dplyr::select(RecKey,
                     PointNbr,
                     parentglobalid,
@@ -127,10 +124,16 @@ cover<-function(x, type="general", by="line"){
       dplyr::mutate(symbol = ifelse(!is.na(symbol_unknown)&stringr::str_detect(symbol,"XXXX$"), symbol_unknown, symbol))%>%
       dplyr::select(-symbol_unknown)%>%
       dplyr::left_join(unknown_plants, by = c("symbol"="UnknownCode"))%>%
-      dplyr::mutate(symbol = ifelse(is.na(FinalCode), symbol, FinalCode))%>%
-      dplyr::group_by(RecKey, parentglobalid, symbol)%>%
-      dplyr::summarize(cover_perc = dplyr::n()/50)%>%
-      dplyr::ungroup()%>%
+      dplyr::mutate(symbol = ifelse(is.na(FinalCode), symbol, FinalCode))
+
+    if(!raw){
+      line<-line%>%
+        dplyr::group_by(RecKey, parentglobalid, symbol)%>%
+        dplyr::summarize(cover_perc = dplyr::n()/50)%>%
+        dplyr::ungroup()
+    }
+
+    line<-line%>%
       dplyr::left_join(plant_list%>%
                          dplyr::select(name, Type, GrowthHabitSub),
                        by=c("symbol" = "name"))%>%
@@ -149,6 +152,10 @@ cover<-function(x, type="general", by="line"){
       ))%>%
       dplyr::left_join(parent_keys, by = c("parentglobalid" = "globalid"))%>%
       dplyr::select(-parentglobalid)
+
+    if(raw){
+      return(line)
+    }
 
       if(by == "plot"){
         line%>%
@@ -176,7 +183,6 @@ height <- function(x, by="line"){
   ## Build Unknown Plants list
   unknown_plants<-x$unknown_plants%>%
     tibble::as_tibble()%>%
-    dplyr::filter(stringr::str_detect(PlotKey, "TRFO|COS01000"))%>%
     dplyr::select(UnknownCode, FinalCode)
 
   plant_list<-readr::read_csv("data/plant_list/CO_Survey123_species_20200504.csv", col_types = readr::cols())%>%
@@ -186,7 +192,6 @@ height <- function(x, by="line"){
     dplyr::select(PlotID, globalid, PlotKey, LineNumber)
 
   height_subset <- x$lpi_detail%>%
-    dplyr::filter(stringr::str_detect(RecKey, "COS01000|TRFO"))%>%
     dplyr::select(parentglobalid,
                   RecKey,
                   PointNbr,

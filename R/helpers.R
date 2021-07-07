@@ -38,3 +38,40 @@ simplify_cover<-function(x, sage=FALSE, growth_type = TRUE){
 }
 
 '%!in%' <- function(x,y)!('%in%'(x,y))
+
+
+strata_full_names<-function(x, year = FALSE){
+  x%>%
+    dplyr::mutate(Strata = case_when(
+      strata =="SS"~"Sagebrush Steppe",
+      strata =="PJ"~"Pinyon Juniper Woodland",
+      strata =="SD"~"Salt Desert",
+      strata =="GR"~"Grassland",
+      strata =="MS"~"Mixed Mountain Shrub",
+      strata =="AS"~"Aspen",
+      strata =="PP"~"Ponderosa Pine",
+      strata =="RI"~"Riparian",
+      strata =="MC"~"Mixed Conifer",
+      strata =="GRSGInt" ~ "Sage Grouse Intensification",
+      strata =="GRSG" ~ "Sage Grouse Intensification"
+    ))
+}
+
+filter_fo<-function(x, field_office="TRFO"){
+
+  field_office<-c("TRFO")
+  filter_string<-c("TRFO|COS01000|Tres_Rios_Field_Office")
+
+  data.frame(field_office, filter_string)
+
+  filter_term<-data.frame(field_office, filter_string)%>%
+    dplyr::filter(field_office==field_office)
+
+  if("RecKey" %in% names(x)){
+    x%>%
+      dplyr::filter(stringr::str_detect(RecKey, filter_term$filter_string))
+  }else{
+    x%>%
+      dplyr::filter(stringr::str_detect(PlotKey, filter_term$filter_string))
+  }
+}

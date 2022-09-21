@@ -17,7 +17,7 @@ arc.check_product()
 
 
 ```{r}
-data_2020<-load_data()
+data_2020<-load_data(year = 2020)
 
 data_2019<-load_data(year = 2019)
 
@@ -72,9 +72,17 @@ By Plot tests
 ```{r}
 names(data_20)
 
-data_20$spec_rich_detail%>%
+data_2020$spec_rich_detail%>%
   dplyr::filter(grepl("Tres Rios|COS01000|TRFO", RecKey))%>%
-  dplyr::left_join(dplyr::select(data_20$species_richness, PlotID, globalid), by=c("parentglobalid"="globalid"))
+  dplyr::left_join(dplyr::select(data_2020a$species_richness, PlotID, globalid), by=c("parentglobalid"="globalid"))
   View()
+```
+
+```{r}
+cleaned_species_rich<-agol_2020[["spec_rich_detail"]]%>%
+      tibble::as_tibble()%>%
+      dplyr::left_join(dplyr::select(agol_2020$species_richness, PlotID, globalid), by=c("parentglobalid"="globalid"))%>%
+      dplyr::mutate(species_code=SpeciesList,
+                    SpeciesList=ifelse(!is.na(UnknownCode), UnknownCode, SpeciesList))
 ```
 

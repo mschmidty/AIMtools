@@ -88,9 +88,32 @@ load_data<-function(year = 2021){
     data_list<-lapply(api_id, read_survey_data, url_2021)
 
     names(data_list)<-plot_names
+  }else if(year==2022){
+    url_2022<-"https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/BLM_CO_AIM_2022_Plots_Service/FeatureServer"
+    api_id<-c(seq(from=0, to=9, by=1), seq(from=11, to=13, by=1), 15, 16)
+
+    plot_names<-c(
+      "plots", #0
+      "aim_photos", #1
+      "gap", #2
+      "known_errors", #3
+      "lpi", #4
+      "plot_char", #5
+      "plot_observation", #6
+      "soil_stability", #7
+      "species_richness", #8
+      "unknown_plants", #9
+      "basal_detail", #11
+      "gap_detail", #12
+      "lpi_detail", #13
+      "soil_pit_horizons",#15
+      "spec_rich_detail" #16
+    )
+    data_list<-lapply(api_id, read_survey_data, url_2022)
+    names(data_list)<-plot_names
   }
   data_list[["unknown_plants"]]<-data_list$unknown_plants%>%
-    dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
+   dplyr::mutate(FinalCode==stringr::str_trim(FinalCode))
 
 
   data_list[["plant_list"]]<-plant_list

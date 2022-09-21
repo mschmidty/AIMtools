@@ -7,14 +7,11 @@
 sp_rich<-function(data, func="count", unknowns=TRUE){
   if(unknowns == TRUE){
     unknown_data<-data[["unknown_plants"]]%>%
-      tibble::as_tibble()%>%
-      dplyr::filter(grepl("COS01000|Tres Rios", Office))%>%
       dplyr::select(UnknownCode, FinalCode)
   }
   if(func == "count"){
     cleaned_species_rich<-data[["spec_rich_detail"]]%>%
       tibble::as_tibble()%>%
-      dplyr::filter(grepl("Tres Rios|COS01000|TRFO", RecKey))%>%
       dplyr::left_join(dplyr::select(data$species_richness, PlotID, globalid), by=c("parentglobalid"="globalid"))%>%
       dplyr::mutate(species_code=SpeciesList,
                     SpeciesList=ifelse(!is.na(UnknownCode), UnknownCode, SpeciesList))
@@ -26,7 +23,7 @@ sp_rich<-function(data, func="count", unknowns=TRUE){
     }
 
     cleaned_species_rich%>%
-      dplyr::group_by(PlotID, species_code)%>%
+      dplyr::group_by(RecKey, PlotID, species_code)%>%
       dplyr::summarize(count=dplyr::n())%>%
       dplyr::ungroup()%>%
       dplyr::mutate(species_code=sub("^\\s+", "", species_code))

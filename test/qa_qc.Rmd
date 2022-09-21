@@ -11,6 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+options(
+  max.print=50,
+  vsc.use_httpgd = TRUE,
+  device = 'windows'
+)
 library(AIMtools)
 library(tidyverse)
 library(arcgisbinding)
@@ -228,4 +233,142 @@ sp_rich(agol_20)%>%
 
 unknown_qc(agol_20)
 ```
+
+
+```{r}
+library(arcgisbinding)
+arc.check_product()
+library(tidyverse)
+library(devtools)
+library(AIMtools)
+
+load_all()
+
+data<-load_data()
+
+rich<-sp_rich(data=data,unknowns=T)%>%
+    dplyr::rename(symbol=2, rich_count=3)
+
+lpi<-cover(data, type="detailed", by="plot")%>%
+  dplyr::count(PlotID, symbol, PlotKey)%>%
+  dplyr::rename(lpi_count=n)%>%
+  dplyr::filter(stringr::str_detect(symbol, ".{3,}"))
+
+lpi_check<-dplyr::left_join(lpi, rich, by=c("PlotID", "symbol"))%>%
+  dplyr::filter(is.na(rich_count))%>%
+  dplyr::select(PlotID, symbol, PlotKey)%>%
+  dplyr::mutate(error="Symbol appears in LPI form but not in Species Richness",
+                fix=paste0("Add this symbol to Species Richness to plot ", PlotID))
+
+unknowns<-data$unknown_plants%>%
+  dplyr::select(PlotID, Office, PlotKey, UnknownCode, FinalCode)%>%
+  dplyr::mutate(FinalCode=ifelse(is.na(FinalCode), UnknownCode, FinalCode))%>%
+  dplyr::filter(!is.na(FinalCode))
+
+richness<-sp_rich(data)
+
+unknown_check<-dplyr::left_join(unknowns, richness, by=c("PlotID", "FinalCode"="species_code") )%>%
+  dplyr::filter(is.na(count))%>%
+  dplyr::select(PlotID, UnknownCode, Office, PlotKey)%>%
+  dplyr::rename(symbol=UnknownCode)%>%
+  dplyr::mutate(error=paste0(symbol, ": Found in Unknown Plant list but not in Species  Richness on ", PlotID),
+                fix=NA)
+
+final_check<-dplyr::bind_rows(unknown_check, lpi_check)
+```
+
+## Have we Evaled
+```{r}
+data$plots%>%
+  filter_fo()%>%
+  filter(panel!="Oversample")%>%
+  count(EvalStatus)
+```
+
+## check 2021   
+```{r}
+qa_qc_2021<-qa_qc(data)
+
+qa_qc_2021$sp_rich_check%>%
+  filter_fo()%>%
+  View()
+```
+
+
+## Check number of plots complete
+```{r}
+library(arcgisbinding)
+arc.check_product()
+library(tidyverse)
+library(devtools)
+library(AIMtools)
+library(here)
+
+data<-load_data(year=2021)
+
+data$plots%>%
+  filter_fo()%>%
+  count(EvalStatus)
+
+qaqc<-qa_qc(data)%>%
+  lapply(filter_fo)
+
+qaqc$unknown_symbol_check%>%
+  write_csv(here("test/output/qaqc_2021_unknown_symbol_check.csv"))
+
+qaqc$sp_rich_check%>%
+  write_csv(here("test/output/qaqc_2021_sp_rich_check.csv"))
+```
+
+## DIMA QA QC
+```{r}
+dima<-read_dima("test_data/DIMA_2021.mdb")
+
+```
+
+
+```{r}
+
+dima_cover(dima)%>%
+  filter(is.na(list_name), symbol!="None")%>%
+  select(symbol, LineID, PlotID)%>%
+  mutate(fix = "Symbol does not match plant list. Revise to species that is on the plant list.")%>%
+  write_csv("test_data/output/qa_qc_DIMA_2021_LPI.csv")
+  
+```
+
+```{r}
+sp_rich_dima(dima)%>%
+  left_join(dima$plant_list, by=c("symbol" = "name"))%>%
+  filter(is.na(list_name))%>%
+  mutate(error = "Not found in Plant list.  Correct or replace with Synonym.")%>%
+  write_csv("test_data/output/qa_qc_DIMA_2021_sp_rich.csv")
+
+dima$plant_list
+  
+```
+## 2022 Tests
+
+```{r}
+library(AIMtools)
+library(tidyverse)
+data<-readRDS("test_cache/agol_2022_08.rds")
+
+qa_qc(data)
+
+rich<-sp_rich(data, unknowns=T)%>%
+  dplyr::rename(symbol=2, rich_count=3)
+  
+lpi<-cover(data, type="detailed", by="plot")%>%
+  dplyr::count(PlotID, symbol, PlotKey)%>%
+  dplyr::rename(lpi_count=n)%>%
+  dplyr::filter(stringr::str_detect(symbol, ".{3,}"))
+
+lpi_check<-dplyr::left_join(lpi, rich, by=c("PlotID" = "symbol"))
+
+qa_qc(data)
+```
+
+
+
 

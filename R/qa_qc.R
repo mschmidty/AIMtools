@@ -11,24 +11,23 @@ sp_rich_qc<-function(x, output=FALSE){
     dplyr::rename(lpi_count=n)%>%
     dplyr::filter(stringr::str_detect(symbol, ".{3,}"))
 
-  lpi_check<-dplyr::left_join(lpi, rich, by=c("PlotID", "symbol"))%>%
+  lpi_check<-dplyr::left_join(lpi, rich, by=c("PlotID" = "symbol"))%>%
     dplyr::filter(is.na(rich_count))%>%
     dplyr::select(PlotID, symbol, PlotKey)%>%
     dplyr::mutate(error="Symbol appears in LPI form but not in Species Richness",
                   fix=paste0("Add this symbol to Species Richness to plot ", PlotID))
 
   unknowns<-x$unknown_plants%>%
+    dplyr::select(PlotID, Office, PlotKey, UnknownCode, FinalCode)%>%
     dplyr::mutate(FinalCode=ifelse(is.na(FinalCode), UnknownCode, FinalCode))%>%
-    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
     dplyr::filter(!is.na(FinalCode))
 
   richness<-sp_rich(x)
 
   unknown_check<-dplyr::left_join(unknowns, richness, by=c("PlotID", "FinalCode"="species_code") )%>%
-    dplyr::mutate(FinalCode=stringr::str_trim(FinalCode))%>%
     dplyr::filter(is.na(count))%>%
-    dplyr::select(PlotID, FinalCode, Office, PlotKey)%>%
-    dplyr::rename(symbol=FinalCode)%>%
+    dplyr::select(PlotID, UnknownCode, Office, PlotKey)%>%
+    dplyr::rename(symbol=UnknownCode)%>%
     dplyr::mutate(error=paste0(symbol, ": Found in Unknown Plant list but not in Species  Richness on ", PlotID),
                   fix=NA)
 
@@ -65,7 +64,7 @@ unknown_qc<-function(x, output=FALSE){
 }
 
 
-#' Runs all qc functions and returns a list of tibbles, each with qc checks. The tables returned are \code(unknown_symbol_check) and \code(sp_rich_check) for now.
+#' Runs all qc functions and returns a list of tibbles, each with qc checks. The tables returned are \code{unknown_symbol_check} and \code{sp_rich_check} for now.
 #'
 #' @param x type list produced by \code{read_dima()} function.
 qa_qc<-function(x){
